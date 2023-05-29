@@ -17,8 +17,11 @@ pub mod point_demo {
         demo_point.set_x(5_f32);
         demo_point.set_y(10_f32);
 
+        println!("{:?}", demo_point.into_reader());
+
         serialize_packed::write_message(&mut ::std::io::stdout(), &message)
     }
+
 }
 
 fn main() {
