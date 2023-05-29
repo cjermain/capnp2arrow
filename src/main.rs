@@ -65,7 +65,7 @@ pub fn map_struct_fields(schema: StructSchema) -> ::capnp::Result<Vec<Field>> {
 
     let union_fields = schema.get_union_fields()?;
     if !union_fields.is_empty() {
-        // TODO: Add support for Unions
+        panic!("unsupported"); // TODO: Add support for Unions
     }
 
     Ok(fields)
