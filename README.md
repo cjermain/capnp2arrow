@@ -3,7 +3,7 @@
 ## Setup
 
 ```
-rustup override set 1.65.0  # set Rust version to newer
+# rustup override set 1.69.0  # set Rust version to newer
 sudo apt install capnproto  # install compiler
 ```
 
@@ -12,7 +12,13 @@ Generate an id: `capnp id`
 ## Demo
 
 ```
-cargo run | capnp decode ./src/schema/point.capnp Point --packed
+cargo run
+```
+
+## Tests
+
+```
+cargo test
 ```
 
 ## Generating examples

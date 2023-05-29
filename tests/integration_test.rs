@@ -1,16 +1,18 @@
 extern crate capnp;
 extern crate core;
+extern crate arrow2;
 extern crate capnp2arrow;
 
-//use capnp::serialize_packed;
 use capnp::dynamic_value;
+use arrow2::datatypes::{DataType, Field, Schema};
 use capnp2arrow::map_schema;
 
 pub mod point_capnp {
     include!(concat!(env!("OUT_DIR"), "/point_capnp.rs"));
 }
 
-fn main() {
+#[test]
+fn test_map_schema() {
     let mut message = ::capnp::message::Builder::new_default();
 
     let mut demo_point = message.init_root::<point_capnp::point::Builder>();
@@ -19,13 +21,12 @@ fn main() {
     demo_point.set_y(10_f32);
 
     let reader = demo_point.into_reader();
-
-    println!("{:?}", reader);
-
-    //serialize_packed::write_message(&mut ::std::io::stdout(), &message);
-
     let dynamic: dynamic_value::Reader = reader.into();
-    let schema = map_schema(dynamic.downcast());
+    let schema = map_schema(dynamic.downcast()).unwrap();
 
-    println!("{:?}", schema);
+    let field_x = Field::new("x", DataType::Float32, true);
+    let field_y = Field::new("y", DataType::Float32, true);
+    let expected_schema = Schema::from(vec![field_x, field_y]);
+
+    assert_eq!(schema, expected_schema);
 }
