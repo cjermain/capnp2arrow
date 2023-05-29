@@ -38,7 +38,7 @@ pub fn map_dtype(capnp_dtype: TypeVariant) -> ::capnp::Result<DataType> {
             let inner_field = Field::new("", inner_dtype, true); // TODO: Determine nullable
             DataType::List(Box::new(inner_field))
         }
-        TypeVariant::Enum(e) => DataType::Null, // TODO: Fix
+        TypeVariant::Enum(_e) => DataType::Null, // TODO: Fix
         TypeVariant::AnyPointer => panic!("unsupported"),
         TypeVariant::Capability => panic!("unsupported")
     };
@@ -55,7 +55,6 @@ pub fn map_field(field: capnp::schema::Field) -> ::capnp::Result<Field> {
 
 pub fn map_struct_fields(schema: StructSchema) -> ::capnp::Result<Vec<Field>> {
     let mut fields = Vec::<Field>::new();
-    let nullable = true; // TODO: Determine nullable
     let non_union_fields = schema.get_non_union_fields()?;
     for field in non_union_fields {
         if field.get_type().is_pointer_type() {
