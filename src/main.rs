@@ -39,9 +39,12 @@ pub fn map_field(field: capnp::schema::Field) -> ::capnp::Result<Field> {
     Ok(Field::new(name, arrow_dtype, nullable))
 }
 
+//pub fn map_list_fields(name: String, reader: dynamic_list::Reader) -> ::capnp::Result<Field> {
+//}
 
-pub fn map_schema(reader: dynamic_struct::Reader) -> ::capnp::Result<Schema> {
+pub fn map_struct_fields(reader: dynamic_struct::Reader) -> ::capnp::Result<Vec<Field>> {
     let mut fields = Vec::<Field>::new();
+    let nullable = true; // TODO: Determine nullable
     let schema = reader.get_schema();
     let non_union_fields = schema.get_non_union_fields()?;
     for field in non_union_fields {
@@ -53,11 +56,15 @@ pub fn map_schema(reader: dynamic_struct::Reader) -> ::capnp::Result<Schema> {
 
     let union_fields = schema.get_union_fields()?;
     if !union_fields.is_empty() {
-        for field in non_union_fields {
-            fields.push(map_field(field).unwrap());
-        }
+        // TODO: Add support for Unions
     }
 
+    Ok(fields)
+}
+
+
+pub fn map_schema(reader: dynamic_struct::Reader) -> ::capnp::Result<Schema> {
+    let fields = map_struct_fields(reader).unwrap();
     Ok(Schema::from(fields))
 }
 
