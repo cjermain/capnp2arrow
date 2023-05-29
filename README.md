@@ -12,7 +12,7 @@ Generate an id: `capnp id`
 ## Demo
 
 ```
-cargo run
+echo '{"x": -2, "y": 5}' | capnp convert json:packed ./src/schema/point.capnp Point | cargo run
 ```
 
 ## Tests
@@ -25,6 +25,7 @@ cargo test
 
 ```
 echo '{"x": 4, "y": 8}' | capnp convert json:packed ./src/schema/point.capnp Point > point.bin
+echo '{"x": 4, "y": 8}' | capnp convert json:packed ./src/schema/point.capnp Point | cat - <(echo "") >> points.bin
 ```
 
 ## References

@@ -15,12 +15,12 @@ pub mod point_capnp {
 fn test_map_schema() {
     let mut message = ::capnp::message::Builder::new_default();
 
-    let mut demo_point = message.init_root::<point_capnp::point::Builder>();
+    let mut point = message.init_root::<point_capnp::point::Builder>();
 
-    demo_point.set_x(5_f32);
-    demo_point.set_y(10_f32);
+    point.set_x(5_f32);
+    point.set_y(10_f32);
 
-    let reader = demo_point.into_reader();
+    let reader = point.into_reader();
     let dynamic: dynamic_value::Reader = reader.into();
     let schema = map_schema(dynamic.downcast()).unwrap();
 
