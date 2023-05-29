@@ -14,3 +14,9 @@ Generate an id: `capnp id`
 ```
 cargo run | capnp decode ./src/schema/point.capnp Point --packed
 ```
+
+## Generating examples
+
+```
+echo '{"x": 4, "y": 8}' | capnp convert json:packed ./src/schema/point.capnp Point > point.bin
+```
