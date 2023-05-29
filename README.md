@@ -8,3 +8,9 @@ sudo apt install capnproto  # install compiler
 ```
 
 Generate an id: `capnp id`
+
+## Demo
+
+```
+cargo run | capnp decode ./src/schema/point.capnp Point --packed
+```

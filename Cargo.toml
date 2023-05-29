@@ -9,3 +9,4 @@ build = "build.rs"
 capnpc = "0.17.1"
 
 [dependencies]
+capnp = "0.17.0"
