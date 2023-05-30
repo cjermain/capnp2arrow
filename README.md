@@ -15,6 +15,14 @@ Generate an id: `capnp id`
 echo '{"x": -2, "y": 5}' | capnp convert json:packed ./src/schema/point.capnp Point | cargo run
 ```
 
+```
+echo '{"x": 4, "y": 8}' | capnp convert json:packed ./src/schema/point.capnp Point | cat - <(echo "") >> points.bin
+echo '{"x": 5, "y": 1}' | capnp convert json:packed ./src/schema/point.capnp Point | cat - <(echo "") >> points.bin
+echo '{"x": 3, "y": -7}' | capnp convert json:packed ./src/schema/point.capnp Point | cat - <(echo "") >> points.bin
+echo '{"x": -2, "y": 4}' | capnp convert json:packed ./src/schema/point.capnp Point | cat - <(echo "") >> points.bin
+cat points.bin | cargo run
+```
+
 ## Tests
 
 ```
