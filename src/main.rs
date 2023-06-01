@@ -3,7 +3,7 @@ extern crate core;
 extern crate capnp2arrow;
 
 use capnp::{dynamic_value, serialize_packed};
-use capnp2arrow::map_schema;
+use capnp2arrow::schema::map_schema;
 
 use std::io::prelude::*;
 

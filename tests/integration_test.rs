@@ -5,7 +5,7 @@ extern crate capnp2arrow;
 
 use capnp::dynamic_value;
 use arrow2::datatypes::{DataType, Field, Schema};
-use capnp2arrow::map_schema;
+use capnp2arrow::schema::map_schema;
 
 pub mod point_capnp {
     include!(concat!(env!("OUT_DIR"), "/point_capnp.rs"));
