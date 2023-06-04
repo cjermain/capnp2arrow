@@ -1,7 +1,7 @@
 [package]
 name = "capnp2arrow"
 version = "0.1.0"
-authors = "Colin Jermain"
+authors = ["Colin Jermain"]
 description = "Cap'N Proto to Arrow data transfer"
 homepage = "https://github.com/cjermain/capnp2arrow"
 license = "MIT"
