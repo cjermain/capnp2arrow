@@ -4,16 +4,14 @@ extern crate capnp2arrow;
 extern crate indexmap;
 extern crate arrow2;
 
-use capnp::{dynamic_value, serialize_packed};
+use capnp::{dynamic_value, serialize_packed, dynamic_struct};
 use capnp::message::Reader;
 use capnp::serialize::OwnedSegments;
 use capnp2arrow::schema::map_schema;
-use capnp2arrow::reader::allocate_array;
+use capnp2arrow::reader::{allocate_array, fill_array};
 use arrow2::chunk::Chunk;
-use arrow2::array::Array;
 use indexmap::map::IndexMap as HashMap;
 
-use capnp::Error;
 use std::io::prelude::*;
 
 pub mod point_capnp {
@@ -62,7 +60,17 @@ fn main() {
         .map(|f| (&f.name, allocate_array(f, size)))
         .collect::<HashMap<_, _>>();
 
-    println!("{:?}", readers.iter().map(|r| r.to_dynamic()).collect::<Vec<_>>());
+    let values = readers.iter().map(|r| r.to_dynamic()).collect::<Vec<_>>();
+    println!("{:?}", values);
+
+    schema.fields.iter().for_each(|f| {
+        let column = columns.get_mut(&f.name).unwrap();
+        let vals: Vec<_> = values
+            .iter()
+            .map(|v| v.downcast::<dynamic_struct::Reader>().get_named(&f.name).unwrap())
+            .collect();
+        fill_array(column, vals.as_slice()).unwrap();
+    });
 
     let chunk = Chunk::new(
         columns.into_values().map(|mut ma| ma.as_box()).collect(),

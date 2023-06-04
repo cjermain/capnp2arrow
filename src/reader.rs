@@ -1,5 +1,6 @@
+use core::borrow::Borrow;
 use capnp::dynamic_value;
-use arrow2::datatypes::{DataType, Field, Schema};
+use arrow2::datatypes::{DataType, Field};
 use arrow2::array::{
     MutableArray,
     MutableBooleanArray,
@@ -9,9 +10,6 @@ use arrow2::array::{
     MutableStructArray,
     MutableListArray
 };
-use arrow2::chunk::Chunk;
-use arrow2::array::Array;
-use indexmap::map::IndexMap as HashMap;
 use capnp::Error; // TODO: Determine best error strategy
 
 pub fn allocate_array(field: &Field, size: Option<usize>) -> Box<dyn MutableArray> {
@@ -48,20 +46,26 @@ pub fn allocate_array(field: &Field, size: Option<usize>) -> Box<dyn MutableArra
     }
 }
 
-pub fn deserialize_messages(
-    messages: Vec<dynamic_value::Reader>,
-    schema: &Schema
-) -> Result<Chunk<Box<dyn Array>>, Error> {
-    let size = Some(0);
-    let mut columns = schema
-        .fields
-        .iter()
-        .map(|f| (&f.name, allocate_array(f, size)))
-        .collect::<HashMap<_, _>>();
 
-    // TODO: Fill in data
+pub fn fill_array<
+    'a,
+    A: Borrow<dynamic_value::Reader<'a>>
+>(
+    column: &mut Box<dyn MutableArray>,
+    //readers: &mut dyn Iterator<Item = dynamic_value::Reader>,
+    values: &[A],
+) -> Result<(), Error> {
+    match column.data_type() {
+        DataType::Float32 => {
+            let column = column.as_mut_any().downcast_mut::<MutablePrimitiveArray<f32>>().unwrap();
+            let iter = values.iter().map(|m| match m.borrow() {
+                dynamic_value::Reader::Float32(x) => Some(x),
+                _ => None
+            });
+            column.extend_trusted_len(iter);
 
-    Ok(Chunk::new(
-        columns.into_values().map(|mut ma| ma.as_box()).collect(),
-    ))
+        }
+        _ => todo!()
+    }
+    Ok(())
 }
