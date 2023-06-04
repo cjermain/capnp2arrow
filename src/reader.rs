@@ -18,6 +18,19 @@ use capnp::Error; // TODO: Determine best Error
 use crate::schema::map_schema;
 
 
+macro_rules! read_primitive {
+    ($v:expr, $c:path, $t:ty) => {
+        {
+            let iter = $v.iter().map(|m| match m.borrow() {
+                $c(x) => Some(x),
+                _ => None
+            });
+            Box::new(MutablePrimitiveArray::<$t>::from_trusted_len_iter(iter))
+        }
+    };
+}
+
+
 pub fn read_to_array<'a, A: Borrow<dynamic_value::Reader<'a>>>(
     field: &Field,
     values: &[A],
@@ -31,40 +44,55 @@ pub fn read_to_array<'a, A: Borrow<dynamic_value::Reader<'a>>>(
             });
             Box::new(MutableBooleanArray::from_trusted_len_iter(iter))
         }
-        DataType::Int8 => todo!(), //Box::new(MutablePrimitiveArray::<i8>::with_capacity(size)),
-        DataType::Int16 => todo!(), //Box::new(MutablePrimitiveArray::<i16>::with_capacity(size)),
-        DataType::Int32 => todo!(), //Box::new(MutablePrimitiveArray::<i32>::with_capacity(size)),
-        DataType::Int64 => todo!(), //Box::new(MutablePrimitiveArray::<i64>::with_capacity(size)),
-        DataType::UInt8 => todo!(), //Box::new(MutablePrimitiveArray::<u8>::with_capacity(size)),
-        DataType::UInt16 => todo!(), //Box::new(MutablePrimitiveArray::<u16>::with_capacity(size)),
-        DataType::UInt32 => todo!(), //Box::new(MutablePrimitiveArray::<u32>::with_capacity(size)),
-        DataType::UInt64 => todo!(), //Box::new(MutablePrimitiveArray::<u64>::with_capacity(size)),
-        DataType::Float32 => {
+        DataType::Int8 => read_primitive!(values, dynamic_value::Reader::Int8, i8),
+        DataType::Int16 => read_primitive!(values, dynamic_value::Reader::Int16, i16),
+        DataType::Int32 => read_primitive!(values, dynamic_value::Reader::Int32, i32),
+        DataType::Int64 => read_primitive!(values, dynamic_value::Reader::Int64, i64),
+        DataType::UInt8 => read_primitive!(values, dynamic_value::Reader::UInt8, u8),
+        DataType::UInt16 => read_primitive!(values, dynamic_value::Reader::UInt16, u16),
+        DataType::UInt32 => read_primitive!(values, dynamic_value::Reader::UInt32, u32),
+        DataType::UInt64 => read_primitive!(values, dynamic_value::Reader::UInt64, u64),
+        DataType::Float32 => read_primitive!(values, dynamic_value::Reader::Float32, f32),
+        DataType::Float64 => read_primitive!(values, dynamic_value::Reader::Float64, f64),
+        DataType::Utf8 =>  {
             let iter = values.iter().map(|m| match m.borrow() {
-                dynamic_value::Reader::Float32(x) => Some(x),
+                dynamic_value::Reader::Text(x) => Some(x),
                 _ => None
             });
-            Box::new(MutablePrimitiveArray::<f32>::from_trusted_len_iter(iter))
+            Box::new(MutableUtf8Array::<i32>::from_trusted_len_iter(iter))
         }
-        DataType::Float64 => {
+        DataType::Binary =>  {
             let iter = values.iter().map(|m| match m.borrow() {
-                dynamic_value::Reader::Float64(x) => Some(x),
+                dynamic_value::Reader::Data(x) => Some(x),
                 _ => None
             });
-            Box::new(MutablePrimitiveArray::<f64>::from_trusted_len_iter(iter))
+            Box::new(MutableBinaryArray::<i32>::from_trusted_len_iter(iter))
         }
-        DataType::Utf8 => todo!(), //Box::new(MutableUtf8Array::<i32>::with_capacity(size)),
-        DataType::Binary => todo!(), //Box::new(MutableBinaryArray::<i32>::with_capacity(size)),
         DataType::Struct(fields) => {
-            todo!();
-            //let values = fields.iter().map(|f| allocate_array(f, Some(size))).collect();
-            //Box::new(MutableStructArray::new(field.data_type().clone(), values))
+            let arrays: Vec<_> = fields
+                .iter()
+                .map(|f| {
+                    let vals: Vec<_> = values
+                        .iter()
+                        .map(|v| v.borrow()
+                             .downcast::<dynamic_struct::Reader>()
+                             .get_named(&f.name)
+                             .unwrap()
+                        )
+                        .collect();
+                        read_to_array(f, vals.as_slice())
+                }).collect();
+            Box::new(MutableStructArray::new(field.data_type().clone(), arrays))
         }
         DataType::List(inner) => {
-            todo!();
-            //let inner_array = allocate_array(inner, Some(size));
-            //let inner_dtype = inner.data_type().clone();
-            //Box::new(MutableListArray::<i32, _>::new_from(inner_array, inner_dtype, size))
+            let inner_values: Vec<dynamic_value::Reader> = values.iter().map(|m| match m.borrow() {
+                //dynamic_value::Reader::List(x) => x,
+                _ => todo!()
+                //_ => dynamic_value::Reader::Void
+            }).collect();
+            let inner_dtype = inner.data_type.clone();
+            let inner_array = read_to_array(inner, inner_values.as_slice());
+            Box::new(MutableListArray::<i32, _>::new_from(inner_array, inner_dtype, values.len()))
         }
         //TypeVariant::Enum(_e) => DataType::Null, // TODO: Fix
         //TypeVariant::AnyPointer => panic!("unsupported"),
