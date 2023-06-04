@@ -10,7 +10,6 @@ use arrow2::array::{
     MutableStructArray,
     MutableListArray
 };
-use capnp::Error; // TODO: Determine best error strategy
 
 pub fn allocate_array(field: &Field, size: Option<usize>) -> Box<dyn MutableArray> {
     let size = size.unwrap_or(0);
@@ -47,14 +46,10 @@ pub fn allocate_array(field: &Field, size: Option<usize>) -> Box<dyn MutableArra
 }
 
 
-pub fn fill_array<
-    'a,
-    A: Borrow<dynamic_value::Reader<'a>>
->(
+pub fn fill_array<'a, A: Borrow<dynamic_value::Reader<'a>>>(
     column: &mut Box<dyn MutableArray>,
-    //readers: &mut dyn Iterator<Item = dynamic_value::Reader>,
     values: &[A],
-) -> Result<(), Error> {
+) {
     match column.data_type() {
         DataType::Float32 => {
             let column = column.as_mut_any().downcast_mut::<MutablePrimitiveArray<f32>>().unwrap();
@@ -63,9 +58,7 @@ pub fn fill_array<
                 _ => None
             });
             column.extend_trusted_len(iter);
-
         }
         _ => todo!()
     }
-    Ok(())
 }

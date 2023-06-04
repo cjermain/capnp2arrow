@@ -69,7 +69,7 @@ fn main() {
             .iter()
             .map(|v| v.downcast::<dynamic_struct::Reader>().get_named(&f.name).unwrap())
             .collect();
-        fill_array(column, vals.as_slice()).unwrap();
+        fill_array(column, vals.as_slice());
     });
 
     let chunk = Chunk::new(
