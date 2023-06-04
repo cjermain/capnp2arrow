@@ -1,9 +1,11 @@
 # capnp2arrow
 
+This is a work-in-progress demonstration of reading a series of Cap'N Proto messages into Arrow. The dynamic value Reader is used to flexibly traverse arbitrary schemas, allowing the library to be schema-agnostic.
+
 ## Setup
 
 ```
-# rustup override set 1.69.0  # run a newer Rust version
+# rustup override set 1.69.0  # run a recent Rust version
 sudo apt install capnproto  # install compiler
 ```
 
