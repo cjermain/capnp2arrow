@@ -1,5 +1,5 @@
 use core::borrow::Borrow;
-use capnp::{dynamic_value, dynamic_struct};
+use capnp::{dynamic_value, dynamic_struct, dynamic_list};
 use arrow2::datatypes::{DataType, Field, Schema};
 use arrow2::array::{
     Array,
@@ -36,7 +36,7 @@ pub fn read_to_array<'a, A: Borrow<dynamic_value::Reader<'a>>>(
     values: &[A],
 ) -> Box<dyn MutableArray> {
     match field.data_type() {
-        DataType::Null => unimplemented!(), // TODO: NullArray,
+        DataType::Null => todo!(), // TODO: NullArray,
         DataType::Boolean =>  {
             let iter = values.iter().map(|m| match m.borrow() {
                 dynamic_value::Reader::Bool(x) => Some(x),
@@ -85,14 +85,28 @@ pub fn read_to_array<'a, A: Borrow<dynamic_value::Reader<'a>>>(
             Box::new(MutableStructArray::new(field.data_type().clone(), arrays))
         }
         DataType::List(inner) => {
-            let inner_values: Vec<dynamic_value::Reader> = values.iter().map(|m| match m.borrow() {
-                //dynamic_value::Reader::List(x) => x,
-                _ => todo!()
-                //_ => dynamic_value::Reader::Void
-            }).collect();
-            let inner_dtype = inner.data_type.clone();
+            let inner_values: Vec<_> = values
+                .iter()
+                .flat_map(|v| match v.borrow() {
+                    dynamic_value::Reader::List(l) => l.iter().map(|x| x.unwrap()),
+                    _ => todo!()
+                })
+                .collect();
+
             let inner_array = read_to_array(inner, inner_values.as_slice());
-            Box::new(MutableListArray::<i32, _>::new_from(inner_array, inner_dtype, values.len()))
+
+            let lengths = values
+                .iter()
+                .map(|v| match v.borrow() {
+                    dynamic_value::Reader::List(l) => Some(l.len() as usize),
+                    _ => None,
+                });
+            
+            let inner_dtype = inner.data_type.clone();
+            let mut array = MutableListArray::<i32, _>::new_from(inner_array, inner_dtype, values.len());
+            array.try_extend_from_lengths(lengths);
+
+            Box::new(array)
         }
         //TypeVariant::Enum(_e) => DataType::Null, // TODO: Fix
         //TypeVariant::AnyPointer => panic!("unsupported"),
