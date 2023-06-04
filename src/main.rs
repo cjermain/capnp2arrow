@@ -4,13 +4,8 @@ extern crate capnp2arrow;
 extern crate indexmap;
 extern crate arrow2;
 
-use capnp::{dynamic_value, serialize_packed, dynamic_struct};
-use capnp::message::Reader;
-use capnp::serialize::OwnedSegments;
-use capnp2arrow::schema::map_schema;
-use capnp2arrow::reader::{allocate_array, fill_array};
-use arrow2::chunk::Chunk;
-use indexmap::map::IndexMap as HashMap;
+use capnp::{dynamic_value, serialize_packed};
+use capnp2arrow::reader::{read_schema, read_to_chunk};
 
 use std::io::prelude::*;
 
@@ -19,62 +14,33 @@ pub mod point_capnp {
 }
 
 
-struct Message {
-    reader: Reader<OwnedSegments>
-}
-
-impl Message {
-    pub fn new(buffer: &[u8]) -> Self {
-        Message {
-            reader: serialize_packed::read_message(
-                buffer,
-                ::capnp::message::ReaderOptions::new(),
-            ).unwrap()
-        }
-    }
-
-    pub fn to_dynamic(&self) -> dynamic_value::Reader {
-        self.reader.get_root::<point_capnp::point::Reader>().unwrap().into()
-    }
-}
-
-
-
 fn main() {
     let stdin = ::std::io::stdin().lock();
 
+    let reader_options = ::capnp::message::ReaderOptions::new();
     let readers: Vec<_> = stdin
         .split(b'\n')
-        .map(|b| Message::new(b.unwrap().as_slice()))
+        .map(|b| {
+            serialize_packed::read_message(
+                b.unwrap().as_slice(), reader_options
+            ).unwrap()
+        })
         .collect();
 
-    // Get the schema from the first line
-    let first_reader = readers[0].to_dynamic();
-    let schema = map_schema(first_reader.downcast()).unwrap();
-    println!("{:?}", schema);
-
-    let size = Some(0);
-    let mut columns = schema
-        .fields
+    let values: Vec<dynamic_value::Reader> = readers
         .iter()
-        .map(|f| (&f.name, allocate_array(f, size)))
-        .collect::<HashMap<_, _>>();
+        .map(|r| {
+            r.get_root::<point_capnp::point::Reader>().unwrap().into()
+        })
+        .collect();
 
-    let values = readers.iter().map(|r| r.to_dynamic()).collect::<Vec<_>>();
     println!("{:?}", values);
 
-    schema.fields.iter().for_each(|f| {
-        let column = columns.get_mut(&f.name).unwrap();
-        let vals: Vec<_> = values
-            .iter()
-            .map(|v| v.downcast::<dynamic_struct::Reader>().get_named(&f.name).unwrap())
-            .collect();
-        fill_array(column, vals.as_slice());
-    });
+    let schema = read_schema(values.as_slice()).unwrap();
 
-    let chunk = Chunk::new(
-        columns.into_values().map(|mut ma| ma.as_box()).collect(),
-    );
+    println!("{:?}", schema);
+
+    let chunk = read_to_chunk(values.as_slice(), &schema).unwrap();
 
     println!("{:?}", chunk);
 }

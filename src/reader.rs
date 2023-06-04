@@ -1,7 +1,8 @@
 use core::borrow::Borrow;
-use capnp::dynamic_value;
-use arrow2::datatypes::{DataType, Field};
+use capnp::{dynamic_value, dynamic_struct};
+use arrow2::datatypes::{DataType, Field, Schema};
 use arrow2::array::{
+    Array,
     MutableArray,
     MutableBooleanArray,
     MutablePrimitiveArray,
@@ -10,6 +11,12 @@ use arrow2::array::{
     MutableStructArray,
     MutableListArray
 };
+use arrow2::chunk::Chunk;
+use indexmap::map::IndexMap as HashMap;
+use capnp::Error; // TODO: Determine best Error
+
+use crate::schema::map_schema;
+
 
 pub fn allocate_array(field: &Field, size: Option<usize>) -> Box<dyn MutableArray> {
     let size = size.unwrap_or(0);
@@ -61,4 +68,36 @@ pub fn fill_array<'a, A: Borrow<dynamic_value::Reader<'a>>>(
         }
         _ => todo!()
     }
+}
+
+pub fn read_schema<'a, A: Borrow<dynamic_value::Reader<'a>>>(
+    values: &[A],
+) -> Result<Schema, Error> {
+    // Get the schema from the first line
+    Ok(map_schema(values[0].borrow().downcast()).unwrap())
+}
+
+pub fn read_to_chunk<'a, A: Borrow<dynamic_value::Reader<'a>>>(
+    values: &[A],
+    schema: &Schema,
+) -> Result<Chunk<Box<dyn Array>>, Error>  {
+    let size = Some(0);
+    let mut columns = schema
+        .fields
+        .iter()
+        .map(|f| (&f.name, allocate_array(f, size)))
+        .collect::<HashMap<_, _>>();
+
+    schema.fields.iter().for_each(|f| {
+        let column = columns.get_mut(&f.name).unwrap();
+        let vals: Vec<_> = values
+            .iter()
+            .map(|v| v.borrow().downcast::<dynamic_struct::Reader>().get_named(&f.name).unwrap())
+            .collect();
+        fill_array(column, vals.as_slice());
+    });
+
+    Ok(Chunk::new(
+        columns.into_values().map(|mut ma| ma.as_box()).collect(),
+    ))
 }
