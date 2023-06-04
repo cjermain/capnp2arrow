@@ -3,7 +3,7 @@
 ## Setup
 
 ```
-# rustup override set 1.69.0  # set Rust version to newer
+# rustup override set 1.69.0  # run a newer Rust version
 sudo apt install capnproto  # install compiler
 ```
 
@@ -29,13 +29,6 @@ cat points.bin | cargo run
 cargo test
 ```
 
-## Generating examples
-
-```
-echo '{"x": 4, "y": 8}' | capnp convert json:packed ./src/schema/point.capnp Point > point.bin
-echo '{"x": 4, "y": 8}' | capnp convert json:packed ./src/schema/point.capnp Point | cat - <(echo "") >> points.bin
-```
-
 ## References
 
 1. Reflection based `Debug` implementation: https://github.com/capnproto/capnproto-rust/blob/f7c86befe11b27f33c2a45957d402abff2b9e347/capnp/src/stringify.rs
@@ -47,3 +40,7 @@ echo '{"x": 4, "y": 8}' | capnp convert json:packed ./src/schema/point.capnp Poi
 4. Arrow2 `DataTypes`: https://docs.rs/arrow2/latest/arrow2/datatypes/enum.DataType.html
 
 5. Cap'N Proto Language Reference: https://capnproto.org/language.html
+
+6. Cap'N Proto test schema: https://github.com/capnproto/capnproto/blob/master/c%2B%2B/src/capnp/test.capnp
+
+7. Cap'N Proto test JSON: https://github.com/capnproto/capnproto/blob/master/c%2B%2B/src/capnp/testdata/pretty.json
