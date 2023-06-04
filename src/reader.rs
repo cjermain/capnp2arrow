@@ -1,5 +1,5 @@
 use core::borrow::Borrow;
-use capnp::{dynamic_value, dynamic_struct, dynamic_list};
+use capnp::{dynamic_value, dynamic_struct};
 use arrow2::datatypes::{DataType, Field, Schema};
 use arrow2::array::{
     Array,
@@ -104,7 +104,7 @@ pub fn read_to_array<'a, A: Borrow<dynamic_value::Reader<'a>>>(
             
             let inner_dtype = inner.data_type.clone();
             let mut array = MutableListArray::<i32, _>::new_from(inner_array, inner_dtype, values.len());
-            array.try_extend_from_lengths(lengths);
+            array.try_extend_from_lengths(lengths).unwrap();
 
             Box::new(array)
         }
