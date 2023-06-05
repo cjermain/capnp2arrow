@@ -102,8 +102,7 @@ pub fn read_to_array<'a, A: Borrow<dynamic_value::Reader<'a>>>(
                     _ => None,
                 });
             
-            let inner_dtype = inner.data_type.clone();
-            let mut array = MutableListArray::<i32, _>::new_from(inner_array, inner_dtype, values.len());
+            let mut array = MutableListArray::<i32, _>::new_with_capacity(inner_array, values.len());
             array.try_extend_from_lengths(lengths).unwrap();
 
             Box::new(array)
