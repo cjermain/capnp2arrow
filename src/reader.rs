@@ -9,8 +9,10 @@ use arrow2::array::{
     MutableUtf8Array,
     MutableBinaryArray,
     MutableStructArray,
-    MutableListArray
+    MutableListArray,
 };
+use arrow2::offset::Offsets;
+use arrow2::bitmap::MutableBitmap;
 use arrow2::chunk::Chunk;
 use indexmap::map::IndexMap as HashMap;
 use capnp::Error; // TODO: Determine best Error
@@ -85,25 +87,29 @@ pub fn read_to_array<'a, A: Borrow<dynamic_value::Reader<'a>>>(
             Box::new(MutableStructArray::new(field.data_type().clone(), arrays))
         }
         DataType::List(inner) => {
-            let inner_values: Vec<_> = values
-                .iter()
-                .flat_map(|v| match v.borrow() {
-                    dynamic_value::Reader::List(l) => l.iter().map(|x| x.unwrap()),
-                    _ => todo!()
-                })
-                .collect();
+            let mut inner_values = vec![];
+            let mut offsets = Offsets::<i32>::with_capacity(values.len());
+            let mut validity = MutableBitmap::with_capacity(values.len());
+
+            values.iter().for_each(|v| match v.borrow() {
+                dynamic_value::Reader::List(l) => {
+                    inner_values.extend(l.iter().map(|x| x.unwrap()));
+                    offsets.try_push_usize(l.len() as usize).expect("List offset too large");
+                    validity.push(true);
+                }
+                _ => {
+                    offsets.extend_constant(1);
+                    validity.push(false)
+                }
+            });
 
             let inner_array = read_to_array(inner, inner_values.as_slice());
 
-            let lengths = values
-                .iter()
-                .map(|v| match v.borrow() {
-                    dynamic_value::Reader::List(l) => Some(l.len() as usize),
-                    _ => None,
-                });
-            
-            let mut array = MutableListArray::<i32, _>::new_with_capacity(inner_array, values.len());
-            array.try_extend_from_lengths(lengths).unwrap();
+            let array = MutableListArray::<i32, _>::new_from_mutable(
+                inner_array,
+                offsets.clone().into(),
+                validity.into(),
+            );
 
             Box::new(array)
         }
