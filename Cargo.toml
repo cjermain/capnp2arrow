@@ -18,7 +18,5 @@ capnp = "0.17.0"
 indexmap = "1.9.3"
 
 [dependencies.arrow2]
-# git = "https://github.com/jorgecarleitao/arrow2"
-# rev = "0d568a38850176d710523771a3a8c14b3d93b9ba"
-git = "https://github.com/cjermain/arrow2"
-rev = "67312c3dfd3e93b22194c41388cfeb7c8a608436"
+git = "https://github.com/jorgecarleitao/arrow2"
+rev = "3ab9b61f0ec6656d4613ad077c87bad6fac4682d"
