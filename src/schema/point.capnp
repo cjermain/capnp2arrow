@@ -4,3 +4,7 @@ struct Point {
     x @0 :Float32;
     y @1 :Float32;
 }
+
+struct Points {
+    values @0 :List(Point);
+}

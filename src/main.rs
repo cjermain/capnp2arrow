@@ -4,10 +4,8 @@ extern crate capnp2arrow;
 extern crate indexmap;
 extern crate arrow2;
 
-use capnp::{dynamic_value, serialize_packed};
+use capnp::{dynamic_value, serialize};
 use capnp2arrow::reader::{read_schema, read_to_chunk};
-
-use std::io::prelude::*;
 
 pub mod point_capnp {
     include!(concat!(env!("OUT_DIR"), "/point_capnp.rs"));
@@ -15,22 +13,22 @@ pub mod point_capnp {
 
 
 fn main() {
-    let stdin = ::std::io::stdin().lock();
+    let stdin = ::std::io::stdin();
 
     let reader_options = ::capnp::message::ReaderOptions::new();
-    let readers: Vec<_> = stdin
-        .split(b'\n')
-        .map(|b| {
-            serialize_packed::read_message(
-                b.unwrap().as_slice(), reader_options
-            ).unwrap()
-        })
-        .collect();
+    let mut readers = vec![];
+    loop {
+        let attempt = serialize::try_read_message(stdin.lock(), reader_options).unwrap();
+        match attempt {
+            Some(r) => readers.push(r),
+            None => break,
+        }
+    }
 
     let values: Vec<dynamic_value::Reader> = readers
         .iter()
         .map(|r| {
-            r.get_root::<point_capnp::point::Reader>().unwrap().into()
+            r.get_root::<point_capnp::points::Reader>().unwrap().into()
         })
         .collect();
 

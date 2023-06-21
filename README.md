@@ -13,15 +13,22 @@ Generate an id: `capnp id`
 
 ## Demo
 
+Create a JSON Lines file with a new-line separated list of points:
 ```
-echo '{"x": -2, "y": 5}' | capnp convert json:packed ./src/schema/point.capnp Point | cargo run
+cat << EOF > points.jsonl
+{"values": [{"x": 0, "y": 1}, {"x": -1, "y": 2}]}
+{"values": [{"x": 0, "y": 0}]}
+{"values": [{"x": -2, "y": 3}]}
+EOF
 ```
 
+Convert the JSONL to binary Cap'N Proto messages based on the schema:
 ```
-echo '{"x": 4, "y": 8}' | capnp convert json:packed ./src/schema/point.capnp Point | cat - <(echo "") >> points.bin
-echo '{"x": 5, "y": 1}' | capnp convert json:packed ./src/schema/point.capnp Point | cat - <(echo "") >> points.bin
-echo '{"x": 3, "y": -7}' | capnp convert json:packed ./src/schema/point.capnp Point | cat - <(echo "") >> points.bin
-echo '{"x": -2, "y": 4}' | capnp convert json:packed ./src/schema/point.capnp Point | cat - <(echo "") >> points.bin
+cat points.jsonl | capnp convert json:binary ./src/schema/point.capnp Points > points.bin
+```
+
+Run the binary messages through the demo:
+```
 cat points.bin | cargo run
 ```
 
