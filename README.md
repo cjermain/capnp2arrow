@@ -5,7 +5,7 @@ This is a work-in-progress demonstration of reading a series of Cap'N Proto mess
 ## Setup
 
 ```
-# rustup override set nightly
+rustup override set nightly
 sudo apt install capnproto  # install compiler
 ```
 
