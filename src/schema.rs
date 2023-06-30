@@ -25,7 +25,7 @@ pub fn map_dtype(capnp_dtype: TypeVariant) -> ::capnp::Result<DataType> {
         }
         TypeVariant::List(l) => {
             let inner_dtype = map_dtype(l.which()).unwrap();
-            let inner_field = Field::new("", inner_dtype, true); // TODO: Determine nullable
+            let inner_field = Field::new("item", inner_dtype, true); // TODO: Determine nullable
             DataType::List(Box::new(inner_field))
         }
         TypeVariant::Enum(_e) => DataType::Null, // TODO: Fix

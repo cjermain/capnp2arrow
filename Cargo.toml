@@ -18,5 +18,16 @@ capnp = "0.17.0"
 indexmap = "1.9.3"
 
 [dependencies.arrow2]
-git = "https://github.com/jorgecarleitao/arrow2"
-rev = "3ab9b61f0ec6656d4613ad077c87bad6fac4682d"
+# git = "https://github.com/jorgecarleitao/arrow2"
+# rev = "3ab9b61f0ec6656d4613ad077c87bad6fac4682d"
+git = "https://github.com/ritchie46/arrow2"
+branch = "polars_2023-06-26"
+
+[dependencies.polars-arrow]
+git = "https://github.com/pola-rs/polars"
+rev = "263ba5153dd3cd03b9f67f5f2de06af19df0529c"
+
+[dependencies.polars]
+git = "https://github.com/pola-rs/polars"
+rev = "263ba5153dd3cd03b9f67f5f2de06af19df0529c"
+features = ["dtype-struct"]

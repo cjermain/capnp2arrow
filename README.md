@@ -5,7 +5,7 @@ This is a work-in-progress demonstration of reading a series of Cap'N Proto mess
 ## Setup
 
 ```
-# rustup override set 1.69.0  # run a recent Rust version
+# rustup override set nightly
 sudo apt install capnproto  # install compiler
 ```
 
@@ -29,13 +29,36 @@ cat points.jsonl | capnp convert json:binary ./src/schema/point.capnp Points > p
 
 Run the binary messages through the demo:
 ```
-cat points.bin | cargo run
+$ cat points.bin | cargo run
+shape: (3, 1)
+┌─────────────────────────┐
+│ values                  │
+│ ---                     │
+│ list[struct[2]]         │
+╞═════════════════════════╡
+│ [{0.0,1.0}, {-1.0,2.0}] │
+│ [{0.0,0.0}]             │
+│ [{-2.0,3.0}]            │
+└─────────────────────────┘
 ```
 
 ## Tests
 
 ```
 cargo test
+```
+
+## Debug
+
+```
+rust-gdb -q target/debug/capnp2arrow
+(gdb) b rust_panic
+(gdb) r < points.bin
+```
+
+The test schema is from the capnproto-rust repo:
+```
+wget -qO- https://raw.githubusercontent.com/capnproto/capnproto-rust/master/capnpc/test/test.capnp > tests/test.capnp
 ```
 
 ## References
