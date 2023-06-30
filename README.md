@@ -48,6 +48,11 @@ shape: (3, 1)
 cargo test
 ```
 
+The test schema is from the capnproto-rust repo:
+```
+wget -qO- https://raw.githubusercontent.com/capnproto/capnproto-rust/master/capnpc/test/test.capnp > tests/test.capnp
+```
+
 ## Debug
 
 ```
@@ -56,10 +61,6 @@ rust-gdb -q target/debug/capnp2arrow
 (gdb) r < points.bin
 ```
 
-The test schema is from the capnproto-rust repo:
-```
-wget -qO- https://raw.githubusercontent.com/capnproto/capnproto-rust/master/capnpc/test/test.capnp > tests/test.capnp
-```
 
 ## References
 
