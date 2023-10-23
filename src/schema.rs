@@ -36,7 +36,7 @@ pub fn map_dtype(capnp_dtype: TypeVariant) -> ::capnp::Result<DataType> {
 }
 
 pub fn map_field(field: capnp::schema::Field) -> ::capnp::Result<Field> {
-    let name = field.get_proto().get_name().unwrap();
+    let name: String = field.get_proto().get_name().unwrap().to_string().unwrap();
     let nullable = true; // TODO: Determine nullable or remove comment
     let capnp_dtype = field.get_type().which();
     let arrow_dtype = map_dtype(capnp_dtype).unwrap();

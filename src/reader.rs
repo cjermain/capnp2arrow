@@ -58,7 +58,7 @@ pub fn read_to_array<'a, A: Borrow<dynamic_value::Reader<'a>>>(
         DataType::Float64 => read_primitive!(values, dynamic_value::Reader::Float64, f64),
         DataType::Utf8 =>  {
             let iter = values.iter().map(|m| match m.borrow() {
-                dynamic_value::Reader::Text(x) => Some(x),
+                dynamic_value::Reader::Text(x) => Some(x.to_string().unwrap()),
                 _ => None
             });
             Box::new(MutableUtf8Array::<i32>::from_trusted_len_iter(iter))
