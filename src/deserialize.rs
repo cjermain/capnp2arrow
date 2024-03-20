@@ -1,6 +1,6 @@
-use crate::array::make_mutable_array;
-use crate::reader::read_from_capnp_struct;
-use crate::zipped_field::ZippedField;
+use crate::array::make_mutable_arrays;
+use crate::reader::{get_schema, read_from_capnp_struct};
+use crate::zipped_field::{zip_fields, ZippedField};
 use capnp::Error;
 use capnp::{dynamic_struct, dynamic_value};
 use polars_arrow::array::{
@@ -8,7 +8,7 @@ use polars_arrow::array::{
     MutableListArray, MutablePrimitiveArray, MutableStructArray, MutableUtf8Array, TryPush,
 };
 use polars_arrow::chunk::Chunk;
-use polars_arrow::datatypes::ArrowDataType;
+use polars_arrow::datatypes::{ArrowDataType, Field as ArrowField};
 
 macro_rules! push_value {
     ($a:expr, $t:ty, $v:expr) => {{
@@ -19,12 +19,10 @@ macro_rules! push_value {
 
 pub fn deserialize(
     messages: &[dynamic_value::Reader],
-    fields: &[ZippedField],
+    arrow_fields: &[ArrowField],
 ) -> Result<Chunk<Box<dyn Array>>, Error> {
-    let mut arrays: Vec<Box<dyn MutableArray>> = fields
-        .iter()
-        .map(|field| make_mutable_array(field, messages.len()))
-        .collect();
+    let fields = zip_fields(get_schema(messages), arrow_fields).unwrap();
+    let mut arrays = make_mutable_arrays(fields.as_slice(), messages.len());
     for message in messages {
         let iter = arrays.iter_mut().zip(fields.iter());
         for (array, field) in iter {
@@ -50,7 +48,10 @@ fn deserialize_struct_field(
     is_valid: bool,
 ) {
     if is_valid {
-        match read_from_capnp_struct(&capnp_struct.downcast::<dynamic_struct::Reader>(), field) {
+        match read_from_capnp_struct(
+            &capnp_struct.downcast::<dynamic_struct::Reader>(),
+            field.capnp_field(),
+        ) {
             Some(capnp_value) => deserialize_value(field, &capnp_value, array, true),
             None => deserialize_value(field, capnp_struct, array, false),
         }
@@ -140,32 +141,26 @@ fn deserialize_value(
             }
             array.push(is_valid);
         }
-        (ArrowDataType::List(_), true) => {
+        (ArrowDataType::List(_), _) => {
             type M = Box<dyn MutableArray>;
             let array = array
                 .as_mut_any()
                 .downcast_mut::<MutableListArray<i32, M>>()
                 .unwrap();
             let inner_array: &mut dyn MutableArray = array.mut_values();
-            let list = capnp_value.downcast::<capnp::dynamic_list::Reader>();
-            for inner_value in list.iter() {
-                deserialize_value(
-                    field.inner_field(),
-                    &inner_value.unwrap(),
-                    inner_array,
-                    is_valid,
-                );
+            if is_valid {
+                let list = capnp_value.downcast::<capnp::dynamic_list::Reader>();
+                for inner_value in list.iter() {
+                    deserialize_value(
+                        field.inner_field(),
+                        &inner_value.unwrap(),
+                        inner_array,
+                        is_valid,
+                    );
+                }
+            } else {
+                deserialize_value(field.inner_field(), capnp_value, inner_array, is_valid);
             }
-            array.try_push_valid().unwrap();
-        }
-        (ArrowDataType::List(_), false) => {
-            type M = Box<dyn MutableArray>;
-            let array = array
-                .as_mut_any()
-                .downcast_mut::<MutableListArray<i32, M>>()
-                .unwrap();
-            let inner_array: &mut dyn MutableArray = array.mut_values();
-            deserialize_value(field.inner_field(), capnp_value, inner_array, is_valid);
             array.try_push_valid().unwrap();
         }
         _ => array.push_null(),

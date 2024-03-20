@@ -1,6 +1,4 @@
-use crate::zipped_field::ZippedField;
-use capnp::{dynamic_struct, dynamic_value};
-use capnp::{message, serialize};
+use capnp::{dynamic_struct, dynamic_value, message, schema, serialize};
 
 // Read all messages from input data.
 // Passing &mut &[u8] to try_read_message() changes the mutable reference to point to the rest
@@ -26,15 +24,25 @@ pub fn capnp_messages_from_data(data: Vec<u8>) -> Vec<message::Reader<serialize:
 // the input capnp value since this will result in an arrow null anyway.
 pub fn read_from_capnp_struct<'a>(
     struct_reader: &dynamic_struct::Reader<'a>,
-    field: &ZippedField,
+    field: &capnp::schema::Field,
 ) -> Option<dynamic_value::Reader<'a>> {
-    let valid_field = struct_reader.has(*field.capnp_field()).unwrap();
-    if !valid_field {
-        None
-    } else {
-        match struct_reader.get(*field.capnp_field()) {
+    if struct_reader.has(*field).unwrap() {
+        match struct_reader.get(*field) {
             Ok(capnp_value) => Some(capnp_value),
-            Err(e) => panic!("{} {}", field.arrow_field().name, e),
+            Err(e) => panic!(
+                "{} {}",
+                field.get_proto().get_name().unwrap().to_string().unwrap(),
+                e
+            ),
         }
+    } else {
+        None
     }
+}
+
+// Get schema from first message since all messages have same schema
+pub fn get_schema(messages: &[dynamic_value::Reader]) -> schema::StructSchema {
+    messages[0]
+        .downcast::<dynamic_struct::Reader>()
+        .get_schema()
 }

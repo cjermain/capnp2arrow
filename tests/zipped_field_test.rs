@@ -1,6 +1,7 @@
-use capnp::dynamic_value;
-use capnp2arrow::reader::capnp_messages_from_data;
-use capnp2arrow::zipped_field::{infer_fields, ZippedField};
+use capnp::{dynamic_struct, dynamic_value};
+use capnp2arrow::arrow_field::infer_fields;
+use capnp2arrow::reader::{capnp_messages_from_data, get_schema};
+use capnp2arrow::zipped_field::{zip_fields, ZippedField};
 use std::fs;
 use std::path::Path;
 
@@ -20,7 +21,8 @@ fn get_fields() -> Vec<ZippedField> {
         })
         .collect();
     let fields = infer_fields(messages.as_slice()).unwrap();
-    fields
+    let capnp_schema = get_schema(messages.as_slice());
+    zip_fields(capnp_schema, fields.as_slice()).unwrap()
 }
 
 fn get_union_fields() -> Vec<ZippedField> {
@@ -37,7 +39,10 @@ fn get_union_fields() -> Vec<ZippedField> {
         })
         .collect();
     let fields = infer_fields(messages.as_slice()).unwrap();
-    fields
+    let capnp_schema = messages[0]
+        .downcast::<dynamic_struct::Reader>()
+        .get_schema();
+    zip_fields(capnp_schema, fields.as_slice()).unwrap()
 }
 
 #[test]

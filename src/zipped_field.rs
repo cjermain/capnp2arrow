@@ -1,23 +1,10 @@
-use crate::arrow_field::capnp_schema_to_arrow_fields;
 use capnp::introspect::TypeVariant;
 use capnp::schema::{Field as CapnpField, StructSchema};
-use capnp::{dynamic_struct, dynamic_value};
 use polars_arrow::datatypes::{ArrowDataType, Field as ArrowField};
 
-pub fn zipped_fields_to_arrow_fields(fields: Vec<ZippedField>) -> Vec<ArrowField> {
-    fields.iter().map(|f| f.arrow_field().clone()).collect()
-}
-
-// Infer the arrow fields and relevant metadata from the first capnp message
-pub fn infer_fields(messages: &[dynamic_value::Reader]) -> ::capnp::Result<Vec<ZippedField>> {
-    let capnp_schema = messages[0]
-        .downcast::<dynamic_struct::Reader>()
-        .get_schema();
-    let arrow_fields = capnp_schema_to_arrow_fields(capnp_schema)?;
-    zip_fields(capnp_schema, arrow_fields)
-}
-
-// A zip of the arrow field and corresponding capnp field
+// Zip the capnp field and corresponding arrow fields into a single ZippedField struct with relevant metadata.
+// This helps significantly improve performance (getting capnp fields is slow) as well as
+// making it easier to reference field metadata in recursive deserialization
 #[derive(Clone)]
 pub struct ZippedField {
     arrow_field: ArrowField,
@@ -65,12 +52,9 @@ impl ZippedField {
     }
 }
 
-// Zip the capnp field and corresponding arrow fields into a single ZippedField struct with relevant metadata.
-// This helps significantly improve performance (getting capnp fields is slow) as well as
-// making it easier to reference field metadata in recursive deserialization
 pub fn zip_fields(
     schema: StructSchema,
-    arrow_fields: Vec<ArrowField>,
+    arrow_fields: &[ArrowField],
 ) -> ::capnp::Result<Vec<ZippedField>> {
     let fields = arrow_fields
         .iter()
@@ -81,8 +65,7 @@ pub fn zip_fields(
                     let mut inner_fields = Vec::<ZippedField>::new();
                     if let TypeVariant::Struct(st) = capnp_field.get_type().which() {
                         let inner_schema: StructSchema = st.into();
-                        inner_fields
-                            .extend(zip_fields(inner_schema, inner_arrow_fields.to_vec()).unwrap());
+                        inner_fields.extend(zip_fields(inner_schema, inner_arrow_fields).unwrap());
                     }
                     ZippedField {
                         arrow_field: ArrowField::new(
@@ -145,7 +128,7 @@ fn zip_list_field(
         ArrowDataType::Struct(inner_arrow_fields) => match capnp_dtype {
             TypeVariant::Struct(st) => {
                 let schema: StructSchema = st.into();
-                let inner_fields = zip_fields(schema, inner_arrow_fields.to_vec())?;
+                let inner_fields = zip_fields(schema, inner_arrow_fields)?;
                 Ok(ZippedField {
                     arrow_field: ArrowField::new(
                         arrow_field.name.to_string(),

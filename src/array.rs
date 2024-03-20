@@ -7,7 +7,14 @@ use polars_arrow::array::{
 };
 use polars_arrow::datatypes::ArrowDataType;
 
-pub fn make_mutable_array(field: &ZippedField, length: usize) -> Box<dyn MutableArray> {
+pub fn make_mutable_arrays(fields: &[ZippedField], length: usize) -> Vec<Box<dyn MutableArray>> {
+    fields
+        .iter()
+        .map(|field| map_mutable_array(field, length))
+        .collect()
+}
+
+fn map_mutable_array(field: &ZippedField, length: usize) -> Box<dyn MutableArray> {
     match field.arrow_field().data_type() {
         ArrowDataType::Null => {
             let mut array = MutableNullArray::new(ArrowDataType::Null, 0);
@@ -37,7 +44,7 @@ pub fn make_mutable_array(field: &ZippedField, length: usize) -> Box<dyn Mutable
         ArrowDataType::Struct(_) => {
             let mut inner_arrays: Vec<Box<dyn MutableArray>> = Vec::new();
             for inner_field in field.inner_fields().iter() {
-                inner_arrays.push(make_mutable_array(inner_field, length));
+                inner_arrays.push(map_mutable_array(inner_field, length));
             }
             Box::new(MutableStructArray::new(
                 field.arrow_field().data_type().clone(),
@@ -45,7 +52,7 @@ pub fn make_mutable_array(field: &ZippedField, length: usize) -> Box<dyn Mutable
             ))
         }
         ArrowDataType::List(_) => {
-            let inner_array = make_mutable_array(field.inner_field(), length);
+            let inner_array = map_mutable_array(field.inner_field(), length);
             Box::new(MutableListArray::<i32, _>::new_from(
                 inner_array,
                 field.arrow_field().data_type().clone(),

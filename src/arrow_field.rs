@@ -1,3 +1,5 @@
+use crate::reader::get_schema;
+use capnp::dynamic_value;
 use capnp::introspect::TypeVariant;
 use capnp::schema::{Field as CapnpField, StructSchema};
 use capnp::Error as CapnpError;
@@ -14,9 +16,13 @@ enum Error {
 
 static MAX_RECURSIVE_DEPTH: i8 = 3;
 
-pub fn capnp_schema_to_arrow_fields(
-    capnp_schema: StructSchema,
-) -> ::capnp::Result<Vec<ArrowField>> {
+// Infer the arrow fields from the capnp messages
+pub fn infer_fields(messages: &[dynamic_value::Reader]) -> ::capnp::Result<Vec<ArrowField>> {
+    let schema = get_schema(messages);
+    capnp_schema_to_arrow_fields(schema)
+}
+
+fn capnp_schema_to_arrow_fields(capnp_schema: StructSchema) -> ::capnp::Result<Vec<ArrowField>> {
     let mut recursion_depth: HashMap<String, i8> = HashMap::new();
     make_arrow_fields(capnp_schema, &mut recursion_depth)
 }

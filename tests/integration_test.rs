@@ -1,7 +1,7 @@
 use capnp::dynamic_value;
+use capnp2arrow::arrow_field::infer_fields;
 use capnp2arrow::deserialize::deserialize;
 use capnp2arrow::reader::capnp_messages_from_data;
-use capnp2arrow::zipped_field::{infer_fields, zipped_fields_to_arrow_fields};
 use polars::datatypes;
 use polars::prelude::*;
 use std::fs;
@@ -24,8 +24,7 @@ fn get_test_df() -> DataFrame {
         .collect();
     let fields = infer_fields(messages.as_slice()).unwrap();
     let chunk = deserialize(messages.as_slice(), fields.as_slice()).unwrap();
-    let arrow_fields = zipped_fields_to_arrow_fields(fields);
-    let df = DataFrame::try_from((chunk, arrow_fields.as_slice())).unwrap();
+    let df = DataFrame::try_from((chunk, fields.as_slice())).unwrap();
     df
 }
 
