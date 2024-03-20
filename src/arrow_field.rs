@@ -3,7 +3,6 @@ use capnp::schema::{Field as CapnpField, StructSchema};
 use capnp::Error as CapnpError;
 use polars_arrow::datatypes::{ArrowDataType, Field as ArrowField, IntegerType};
 use std::collections::HashMap;
-use crate::field::{Field, zip_fields};
 
 type Result<T> = std::result::Result<T, Error>;
 
@@ -15,17 +14,14 @@ enum Error {
 
 static MAX_RECURSIVE_DEPTH: i8 = 3;
 
-pub fn make_arrow_fields(fields: Vec<Field>) -> Vec<ArrowField> {
-    fields.iter().map(|f| f.arrow_field().clone()).collect()
-}
-
-pub fn schema_to_fields(capnp_schema: StructSchema) -> ::capnp::Result<Vec<Field>> {
+pub fn capnp_schema_to_arrow_fields(
+    capnp_schema: StructSchema,
+) -> ::capnp::Result<Vec<ArrowField>> {
     let mut recursion_depth: HashMap<String, i8> = HashMap::new();
-    let arrow_fields = map_arrow_fields(capnp_schema, &mut recursion_depth)?;
-    zip_fields(capnp_schema, arrow_fields)
+    make_arrow_fields(capnp_schema, &mut recursion_depth)
 }
 
-fn map_arrow_fields(
+fn make_arrow_fields(
     schema: StructSchema,
     recursion_depth: &mut HashMap<String, i8>,
 ) -> ::capnp::Result<Vec<ArrowField>> {
@@ -35,7 +31,7 @@ fn map_arrow_fields(
         if field.get_type().is_pointer_type() {
             // TODO: Determine how to handle
         }
-        match map_arrow_field(field, recursion_depth) {
+        match capnp_field_to_arrow_field(field, recursion_depth) {
             Ok(field) => arrow_fields.push(field),
             Err(e) => match e {
                 Error::EmptyStruct => eprintln!(
@@ -54,7 +50,10 @@ fn map_arrow_fields(
     Ok(arrow_fields)
 }
 
-fn map_arrow_field(field: CapnpField, recursion_depth: &mut HashMap<String, i8>) -> Result<ArrowField> {
+fn capnp_field_to_arrow_field(
+    field: CapnpField,
+    recursion_depth: &mut HashMap<String, i8>,
+) -> Result<ArrowField> {
     let name = match field_name(field) {
         Ok(name) => name,
         Err(e) => return Err(Error::Capnp(e)),
@@ -63,7 +62,7 @@ fn map_arrow_field(field: CapnpField, recursion_depth: &mut HashMap<String, i8>)
     let nullable = true; // TODO: Determine nullable or remove comment
     let capnp_dtype = field.get_type().which();
     let arrow_dtype = match limit_recursion(&name, capnp_dtype, recursion_depth) {
-        false => map_arrow_dtype(capnp_dtype, recursion_depth)?,
+        false => capnp_dtype_to_arrow_dtype(capnp_dtype, recursion_depth)?,
         true => match capnp_dtype {
             TypeVariant::Struct(_) => return Err(Error::RecursionLimitExceeded),
             TypeVariant::List(_) => return Err(Error::RecursionLimitExceeded),
@@ -77,7 +76,7 @@ fn field_name(field: CapnpField) -> ::capnp::Result<String> {
     Ok(field.get_proto().get_name()?.to_string()?)
 }
 
-fn map_arrow_dtype(
+fn capnp_dtype_to_arrow_dtype(
     capnp_dtype: TypeVariant,
     recursion_depth: &mut HashMap<String, i8>,
 ) -> Result<ArrowDataType> {
@@ -94,17 +93,16 @@ fn map_arrow_dtype(
         TypeVariant::UInt64 => ArrowDataType::UInt64,
         TypeVariant::Float32 => ArrowDataType::Float32,
         TypeVariant::Float64 => ArrowDataType::Float64,
-        TypeVariant::Text => ArrowDataType::Utf8, // always UTF8 and NUL-terminated
-        TypeVariant::Data => ArrowDataType::Binary, // TODO: Determine if this covers all cases
+        TypeVariant::Text => ArrowDataType::Utf8,
+        TypeVariant::Data => ArrowDataType::Binary,
         TypeVariant::Struct(st) => {
             let schema: StructSchema = st.into();
             let fields = match &schema.get_fields() {
                 Ok(capnp_fields) => {
-                    // Capnp allows 0 field structs but arrow structs require at least one field
                     if capnp_fields.is_empty() {
                         return Err(Error::EmptyStruct);
                     } else {
-                        match map_arrow_fields(schema, recursion_depth) {
+                        match make_arrow_fields(schema, recursion_depth) {
                             Ok(fields) => fields,
                             Err(e) => return Err(Error::Capnp(e)),
                         }
@@ -117,7 +115,7 @@ fn map_arrow_dtype(
             ArrowDataType::Struct(fields)
         }
         TypeVariant::List(l) => {
-            let inner_dtype = map_arrow_dtype(l.which(), recursion_depth)?;
+            let inner_dtype = capnp_dtype_to_arrow_dtype(l.which(), recursion_depth)?;
             let inner_field = ArrowField::new("item", inner_dtype, true); // TODO: Determine nullable
             ArrowDataType::List(Box::new(inner_field))
         }
@@ -131,7 +129,7 @@ fn map_arrow_dtype(
 }
 
 // For recusive structs we need to break recursion of the schema at a reasonable level
-// We will ignore any values below this limit
+// We will ignore any nested lists or structs beyond this limit
 fn limit_recursion(
     name: &String,
     capnp_dtype: TypeVariant,
@@ -151,7 +149,7 @@ fn limit_recursion(
                     return true;
                 }
             }
-        },
+        }
         _ => (),
     }
     false

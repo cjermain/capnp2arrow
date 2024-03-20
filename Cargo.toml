@@ -17,12 +17,10 @@ capnpc = "0.19.0"
 [dev-dependencies]
 smartstring = "1.0.1"
 
-[dependencies]
-capnp = "0.19.1"
-
-[dependencies.polars]
+[dev-dependencies.polars]
 version = "0.38.1"
 features = ["dtype-struct", "dtype-i8", "dtype-i16", "dtype-u8", "dtype-u16", "dtype-categorical", "rows"]
 
-[dependencies.polars-arrow]
-version = "0.38.1"
+[dependencies]
+capnp = "0.19.1"
+polars-arrow = "0.38.1"

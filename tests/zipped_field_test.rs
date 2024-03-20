@@ -1,13 +1,12 @@
 use capnp::dynamic_value;
-use capnp2arrow::field::Field;
 use capnp2arrow::reader::capnp_messages_from_data;
-use capnp2arrow::deserialize::infer_fields;
+use capnp2arrow::zipped_field::{infer_fields, ZippedField};
 use std::fs;
 use std::path::Path;
 
 include! {"../src/test.rs"}
 
-fn get_fields() -> Vec<Field> {
+fn get_fields() -> Vec<ZippedField> {
     let data_path = Path::new("tests/test_data/all_types.bin");
     let data = fs::read(data_path).unwrap();
 
@@ -24,7 +23,7 @@ fn get_fields() -> Vec<Field> {
     fields
 }
 
-fn get_union_fields() -> Vec<Field> {
+fn get_union_fields() -> Vec<ZippedField> {
     let data_path = Path::new("tests/test_data/union.bin");
     let data = fs::read(data_path).unwrap();
 
@@ -175,7 +174,7 @@ fn test_nested_struct_field() {
 
 #[test]
 fn test_union_fields() {
-    let fields: Vec<Field> = get_union_fields();
+    let fields: Vec<ZippedField> = get_union_fields();
     assert_eq!(fields.len(), 4);
     assert_eq!(fields[0].arrow_field().name, "union0");
     assert_eq!(fields[1].arrow_field().name, "listOuter");
@@ -185,7 +184,7 @@ fn test_union_fields() {
 
 #[test]
 fn test_nested_union_list_field() {
-    let fields: Vec<Field> = get_union_fields();
+    let fields: Vec<ZippedField> = get_union_fields();
     let list_children = &fields[1].inner_fields();
     assert_eq!(&list_children[0].arrow_field().name, "item");
     let outer_struct_children = &list_children[0].inner_fields();
@@ -199,12 +198,12 @@ fn test_nested_union_list_field() {
     assert_eq!(inner_struct_children.len(), 1);
     assert_eq!(baz.arrow_field().name, "baz");
     assert_eq!(
-    baz.capnp_field()
-        .get_proto()
-        .get_name()
-        .unwrap()
-        .to_string()
-        .unwrap(),
-    "baz"
+        baz.capnp_field()
+            .get_proto()
+            .get_name()
+            .unwrap()
+            .to_string()
+            .unwrap(),
+        "baz"
     );
 }
