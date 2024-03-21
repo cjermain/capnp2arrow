@@ -21,10 +21,10 @@ pub fn deserialize(
     messages: &[dynamic_value::Reader],
     arrow_fields: &[ArrowField],
 ) -> Result<Chunk<Box<dyn Array>>, Error> {
-    let fields = zip_fields(get_schema(messages), arrow_fields).unwrap();
-    let mut arrays = make_mutable_arrays(fields.as_slice(), messages.len());
+    let mut arrays = make_mutable_arrays(arrow_fields, messages.len());
+    let zipped_fields = zip_fields(get_schema(messages), arrow_fields).unwrap();
     for message in messages {
-        let iter = arrays.iter_mut().zip(fields.iter());
+        let iter = arrays.iter_mut().zip(zipped_fields.iter());
         for (array, field) in iter {
             deserialize_struct_field(field, message, array.as_mut(), true);
         }
@@ -42,7 +42,7 @@ pub fn deserialize(
 // and is not valid for this message. We ignore the capnp value and will push a null
 // value to the arrow array and any inner arrays of nested types (lists and structs).
 fn deserialize_struct_field(
-    field: &ZippedField,
+    zipped_field: &ZippedField,
     capnp_struct: &dynamic_value::Reader,
     array: &mut dyn MutableArray,
     is_valid: bool,
@@ -50,23 +50,23 @@ fn deserialize_struct_field(
     if is_valid {
         match read_from_capnp_struct(
             &capnp_struct.downcast::<dynamic_struct::Reader>(),
-            field.capnp_field(),
+            zipped_field.capnp_field(),
         ) {
-            Some(capnp_value) => deserialize_value(field, &capnp_value, array, true),
-            None => deserialize_value(field, capnp_struct, array, false),
+            Some(capnp_value) => deserialize_value(zipped_field, &capnp_value, array, true),
+            None => deserialize_value(zipped_field, capnp_struct, array, false),
         }
     } else {
-        deserialize_value(field, capnp_struct, array, false);
+        deserialize_value(zipped_field, capnp_struct, array, false);
     }
 }
 
 fn deserialize_value(
-    field: &ZippedField,
+    zipped_field: &ZippedField,
     capnp_value: &dynamic_value::Reader,
     array: &mut dyn MutableArray,
     is_valid: bool,
 ) {
-    match (field.arrow_field().data_type(), is_valid) {
+    match (zipped_field.arrow_field().data_type(), is_valid) {
         (ArrowDataType::Boolean, true) => {
             push_value!(array, MutableBooleanArray, capnp_value.downcast())
         }
@@ -135,7 +135,7 @@ fn deserialize_value(
             for (inner_array, inner_field) in array
                 .mut_values()
                 .iter_mut()
-                .zip(field.inner_fields().iter())
+                .zip(zipped_field.inner_fields().iter())
             {
                 deserialize_struct_field(inner_field, capnp_value, inner_array.as_mut(), is_valid);
             }
@@ -152,14 +152,19 @@ fn deserialize_value(
                 let list = capnp_value.downcast::<capnp::dynamic_list::Reader>();
                 for inner_value in list.iter() {
                     deserialize_value(
-                        field.inner_field(),
+                        zipped_field.inner_field(),
                         &inner_value.unwrap(),
                         inner_array,
                         is_valid,
                     );
                 }
             } else {
-                deserialize_value(field.inner_field(), capnp_value, inner_array, is_valid);
+                deserialize_value(
+                    zipped_field.inner_field(),
+                    capnp_value,
+                    inner_array,
+                    is_valid,
+                );
             }
             array.try_push_valid().unwrap();
         }

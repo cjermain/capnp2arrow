@@ -2,14 +2,13 @@ use capnp::introspect::TypeVariant;
 use capnp::schema::{Field as CapnpField, StructSchema};
 use polars_arrow::datatypes::{ArrowDataType, Field as ArrowField};
 
-// Zip the capnp field and corresponding arrow fields into a single ZippedField struct with relevant metadata.
+// Zip the capnp field and corresponding arrow fields into a single ZippedField struct.
 // This helps significantly improve performance (getting capnp fields is slow) as well as
 // making it easier to reference field metadata in recursive deserialization
 #[derive(Clone)]
 pub struct ZippedField {
     arrow_field: ArrowField,
     capnp_field: Option<CapnpField>,
-    capnp_dtype: TypeVariant,
     nested_inner_fields: Option<Vec<ZippedField>>,
 }
 
@@ -23,10 +22,6 @@ impl ZippedField {
             Some(f) => f,
             None => panic!("Expected field '{}' to have a capnp field. Only list items should not have a capnp field.", self.arrow_field.name)
         }
-    }
-
-    pub fn capnp_dtype(&self) -> &TypeVariant {
-        &self.capnp_dtype
     }
 
     pub fn inner_fields(&self) -> &Vec<ZippedField> {
@@ -74,7 +69,6 @@ pub fn zip_fields(
                             true,
                         ),
                         capnp_field: Some(capnp_field),
-                        capnp_dtype: capnp_field.get_type().which(),
                         nested_inner_fields: Some(inner_fields),
                     }
                 }
@@ -100,7 +94,6 @@ pub fn zip_fields(
                             true,
                         ),
                         capnp_field: Some(capnp_field),
-                        capnp_dtype: capnp_field.get_type().which(),
                         nested_inner_fields: Some(inner_fields),
                     }
                 }
@@ -111,7 +104,6 @@ pub fn zip_fields(
                         true,
                     ),
                     capnp_field: Some(capnp_field),
-                    capnp_dtype: capnp_field.get_type().which(),
                     nested_inner_fields: None,
                 },
             }
@@ -136,7 +128,6 @@ fn zip_list_field(
                         true,
                     ),
                     capnp_field: None,
-                    capnp_dtype,
                     nested_inner_fields: Some(inner_fields),
                 })
             }
@@ -158,7 +149,6 @@ fn zip_list_field(
         _ => Ok(ZippedField {
             arrow_field,
             capnp_field: None,
-            capnp_dtype,
             nested_inner_fields: None,
         }),
     }

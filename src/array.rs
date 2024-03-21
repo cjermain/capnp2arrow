@@ -1,21 +1,20 @@
-use crate::zipped_field::ZippedField;
-use capnp::introspect::{RawEnumSchema, TypeVariant};
+use crate::arrow_field::{ENUMERANTS_METADATA_KEY, ENUMERANTS_METADATA_SEPARATOR};
 use polars_arrow::array::{
     MutableArray, MutableBinaryArray, MutableBooleanArray, MutableDictionaryArray,
     MutableListArray, MutableNullArray, MutablePrimitiveArray, MutableStructArray,
     MutableUtf8Array,
 };
-use polars_arrow::datatypes::ArrowDataType;
+use polars_arrow::datatypes::{ArrowDataType, Field as ArrowField};
 
-pub fn make_mutable_arrays(fields: &[ZippedField], length: usize) -> Vec<Box<dyn MutableArray>> {
+pub fn make_mutable_arrays(fields: &[ArrowField], length: usize) -> Vec<Box<dyn MutableArray>> {
     fields
         .iter()
         .map(|field| map_mutable_array(field, length))
         .collect()
 }
 
-fn map_mutable_array(field: &ZippedField, length: usize) -> Box<dyn MutableArray> {
-    match field.arrow_field().data_type() {
+fn map_mutable_array(field: &ArrowField, length: usize) -> Box<dyn MutableArray> {
+    match field.data_type() {
         ArrowDataType::Null => {
             let mut array = MutableNullArray::new(ArrowDataType::Null, 0);
             array.reserve(length);
@@ -34,49 +33,40 @@ fn map_mutable_array(field: &ZippedField, length: usize) -> Box<dyn MutableArray
         ArrowDataType::Float64 => Box::new(MutablePrimitiveArray::<f64>::with_capacity(length)),
         ArrowDataType::Utf8 => Box::new(MutableUtf8Array::<i32>::with_capacity(length)),
         ArrowDataType::Binary => Box::new(MutableBinaryArray::<i32>::with_capacity(length)),
-        ArrowDataType::Dictionary(_, _, _) => match field.capnp_dtype() {
-            TypeVariant::Enum(enum_schema) => initialize_dictionary_enumerants(enum_schema, length),
-            _ => panic!(
-                "Expected enum type to match dictionary for field '{}'",
-                field.arrow_field().name
-            ),
-        },
-        ArrowDataType::Struct(_) => {
+        ArrowDataType::Dictionary(_, _, _) => {
+            let mut enumerants = MutableUtf8Array::<i32>::new();
+            for enumerant in field
+                .metadata
+                .get(ENUMERANTS_METADATA_KEY)
+                .expect("Dictionary fields should have enumerants in metadata")
+                .split(ENUMERANTS_METADATA_SEPARATOR)
+            {
+                enumerants.push(Some(enumerant));
+            }
+            let mut array =
+                MutableDictionaryArray::<u16, MutableUtf8Array<i32>>::from_values(enumerants)
+                    .unwrap();
+            array.reserve(length);
+            Box::new(array)
+        }
+        ArrowDataType::Struct(inner_fields) => {
             let mut inner_arrays: Vec<Box<dyn MutableArray>> = Vec::new();
-            for inner_field in field.inner_fields().iter() {
+            for inner_field in inner_fields.iter() {
                 inner_arrays.push(map_mutable_array(inner_field, length));
             }
             Box::new(MutableStructArray::new(
-                field.arrow_field().data_type().clone(),
+                field.data_type().clone(),
                 inner_arrays,
             ))
         }
-        ArrowDataType::List(_) => {
-            let inner_array = map_mutable_array(field.inner_field(), length);
+        ArrowDataType::List(inner_field) => {
+            let inner_array = map_mutable_array(inner_field, length);
             Box::new(MutableListArray::<i32, _>::new_from(
                 inner_array,
-                field.arrow_field().data_type().clone(),
+                field.data_type().clone(),
                 length,
             ))
         }
         _ => panic!("unsupported type"),
     }
-}
-
-// Initializing the dictionary with the enumerants guarantees that the dictionary
-// will have the same indexing when deserializing the same capnp schema.
-fn initialize_dictionary_enumerants(
-    enum_schema: &RawEnumSchema,
-    length: usize,
-) -> Box<dyn MutableArray> {
-    let mut enumerants = MutableUtf8Array::<i32>::new();
-    capnp::schema::EnumSchema::from(*enum_schema)
-        .get_enumerants()
-        .unwrap()
-        .iter()
-        .for_each(|e| enumerants.push(Some(e.get_proto().get_name().unwrap().to_str().unwrap())));
-    let mut array =
-        MutableDictionaryArray::<u16, MutableUtf8Array<i32>>::from_values(enumerants).unwrap();
-    array.reserve(length);
-    Box::new(array)
 }

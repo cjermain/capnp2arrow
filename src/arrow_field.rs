@@ -1,9 +1,10 @@
 use crate::reader::get_schema;
 use capnp::dynamic_value;
-use capnp::introspect::TypeVariant;
+use capnp::introspect::{RawEnumSchema, TypeVariant};
 use capnp::schema::{Field as CapnpField, StructSchema};
 use capnp::Error as CapnpError;
 use polars_arrow::datatypes::{ArrowDataType, Field as ArrowField, IntegerType};
+use std::collections::BTreeMap;
 use std::collections::HashMap;
 
 type Result<T> = std::result::Result<T, Error>;
@@ -14,6 +15,8 @@ enum Error {
     RecursionLimitExceeded,
 }
 
+pub static ENUMERANTS_METADATA_KEY: &str = "enumerants";
+pub static ENUMERANTS_METADATA_SEPARATOR: &str = " ";
 static MAX_RECURSIVE_DEPTH: i8 = 3;
 
 // Infer the arrow fields from the capnp messages
@@ -65,7 +68,7 @@ fn capnp_field_to_arrow_field(
         Err(e) => return Err(Error::Capnp(e)),
     };
     // Union fields must be nullable
-    let nullable = true; // TODO: Determine nullable or remove comment
+    let is_nullable = true; // TODO: Determine nullable or remove comment
     let capnp_dtype = field.get_type().which();
     let arrow_dtype = match limit_recursion(&name, capnp_dtype, recursion_depth) {
         false => capnp_dtype_to_arrow_dtype(capnp_dtype, recursion_depth)?,
@@ -75,11 +78,16 @@ fn capnp_field_to_arrow_field(
             _ => panic!("Expected recursion limiting to only affect struct and list"),
         },
     };
-    Ok(ArrowField::new(name, arrow_dtype, nullable))
-}
-
-fn field_name(field: CapnpField) -> ::capnp::Result<String> {
-    Ok(field.get_proto().get_name()?.to_string()?)
+    if let TypeVariant::Enum(e) = capnp_dtype {
+        let metadata = get_enum_metadata(&e);
+        return Ok(ArrowField {
+            name,
+            data_type: arrow_dtype,
+            is_nullable,
+            metadata,
+        });
+    }
+    Ok(ArrowField::new(name, arrow_dtype, is_nullable))
 }
 
 fn capnp_dtype_to_arrow_dtype(
@@ -121,8 +129,20 @@ fn capnp_dtype_to_arrow_dtype(
             ArrowDataType::Struct(fields)
         }
         TypeVariant::List(l) => {
-            let inner_dtype = capnp_dtype_to_arrow_dtype(l.which(), recursion_depth)?;
-            let inner_field = ArrowField::new("item", inner_dtype, true); // TODO: Determine nullable
+            let inner_capnp_dtype = l.which();
+            let inner_dtype = capnp_dtype_to_arrow_dtype(inner_capnp_dtype, recursion_depth)?;
+            let inner_field = match inner_capnp_dtype {
+                TypeVariant::Enum(e) => {
+                    let metadata = get_enum_metadata(&e);
+                    ArrowField {
+                        name: String::from("item"),
+                        data_type: inner_dtype,
+                        is_nullable: true,
+                        metadata,
+                    }
+                }
+                _ => ArrowField::new("item", inner_dtype, true), // TODO: Determine nullable
+            };
             ArrowDataType::List(Box::new(inner_field))
         }
         TypeVariant::Enum(_e) => {
@@ -167,4 +187,23 @@ fn update_recusion_depth(name: &String, recursion_depth: &mut HashMap<String, i8
     } else {
         recursion_depth.insert(name.to_string(), 1);
     }
+}
+
+fn get_enum_metadata(enum_schema: &RawEnumSchema) -> BTreeMap<String, String> {
+    let mut metadata: BTreeMap<String, String> = BTreeMap::new();
+    let mut enumerants = Vec::<String>::new();
+    capnp::schema::EnumSchema::from(*enum_schema)
+        .get_enumerants()
+        .unwrap()
+        .iter()
+        .for_each(|e| enumerants.push(e.get_proto().get_name().unwrap().to_string().unwrap()));
+    metadata.insert(
+        String::from(ENUMERANTS_METADATA_KEY),
+        enumerants.join(ENUMERANTS_METADATA_SEPARATOR),
+    );
+    metadata
+}
+
+fn field_name(field: CapnpField) -> ::capnp::Result<String> {
+    Ok(field.get_proto().get_name()?.to_string()?)
 }
