@@ -15,9 +15,9 @@ enum Error {
     RecursionLimitExceeded,
 }
 
-pub static ENUMERANTS_METADATA_KEY: &str = "enumerants";
-pub static ENUMERANTS_METADATA_SEPARATOR: &str = " ";
-static MAX_RECURSIVE_DEPTH: i8 = 3;
+pub const ENUMERANTS_METADATA_KEY: &str = "enumerants";
+pub const ENUMERANTS_METADATA_SEPARATOR: &str = " ";
+const MAX_RECURSIVE_DEPTH: i8 = 3;
 
 // Infer the arrow fields from the capnp messages
 pub fn infer_fields(messages: &[dynamic_value::Reader]) -> ::capnp::Result<Vec<ArrowField>> {

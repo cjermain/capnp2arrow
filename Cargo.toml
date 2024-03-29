@@ -22,5 +22,5 @@ version = "0.38.1"
 features = ["dtype-struct", "dtype-i8", "dtype-i16", "dtype-u8", "dtype-u16", "dtype-categorical", "rows"]
 
 [dependencies]
-capnp = "0.19.1"
+capnp = "0.19.3"
 polars-arrow = "0.38.1"
