@@ -1,153 +1,48 @@
-use core::borrow::Borrow;
-use capnp::{dynamic_value, dynamic_struct};
-use arrow2::datatypes::{DataType, Field, Schema};
-use arrow2::array::{
-    Array,
-    MutableArray,
-    MutableBooleanArray,
-    MutablePrimitiveArray,
-    MutableUtf8Array,
-    MutableBinaryArray,
-    MutableStructArray,
-    MutableListArray,
-};
-use arrow2::offset::Offsets;
-use arrow2::bitmap::MutableBitmap;
-use arrow2::chunk::Chunk;
-use indexmap::map::IndexMap as HashMap;
-use capnp::Error; // TODO: Determine best Error
+use capnp::{dynamic_struct, dynamic_value, message, schema, serialize};
 
-use crate::schema::map_schema;
-
-
-macro_rules! read_primitive {
-    ($v:expr, $c:path, $t:ty) => {
-        {
-            let iter = $v.iter().map(|m| match m.borrow() {
-                $c(x) => Some(x),
-                _ => None
-            });
-            Box::new(MutablePrimitiveArray::<$t>::from_trusted_len_iter(iter))
-        }
-    };
+// Read all messages from input data.
+// Passing &mut &[u8] to try_read_message() changes the mutable reference to point to the rest
+// of the byte stream.
+pub fn capnp_messages_from_data(data: Vec<u8>) -> Vec<message::Reader<serialize::OwnedSegments>> {
+    let reader_options = message::ReaderOptions::new();
+    let mut messages = Vec::new();
+    let mut head_of_remaining_messages = &mut &data[..];
+    loop {
+        let Some(reader) =
+            serialize::try_read_message(&mut head_of_remaining_messages, reader_options).unwrap()
+        else {
+            break; // End of messages in the data
+        };
+        messages.push(reader)
+    }
+    messages
 }
 
-
-pub fn read_to_array<'a, A: Borrow<dynamic_value::Reader<'a>>>(
-    field: &Field,
-    values: &[A],
-) -> Box<dyn MutableArray> {
-    match field.data_type() {
-        DataType::Null => todo!(), // TODO: NullArray,
-        DataType::Boolean =>  {
-            let iter = values.iter().map(|m| match m.borrow() {
-                dynamic_value::Reader::Bool(x) => Some(x),
-                _ => None
-            });
-            Box::new(MutableBooleanArray::from_trusted_len_iter(iter))
+// Read the capnp field from a struct
+// For structs with unions we need to determine if the field is active in the union.
+// If the field is not active member of the union then we immediately return
+// the input capnp value since this will result in an arrow null anyway.
+pub fn read_from_capnp_struct<'a>(
+    struct_reader: &dynamic_struct::Reader<'a>,
+    field: &capnp::schema::Field,
+) -> Option<dynamic_value::Reader<'a>> {
+    if struct_reader.has(*field).unwrap() {
+        match struct_reader.get(*field) {
+            Ok(capnp_value) => Some(capnp_value),
+            Err(e) => panic!(
+                "{} {}",
+                field.get_proto().get_name().unwrap().to_string().unwrap(),
+                e
+            ),
         }
-        DataType::Int8 => read_primitive!(values, dynamic_value::Reader::Int8, i8),
-        DataType::Int16 => read_primitive!(values, dynamic_value::Reader::Int16, i16),
-        DataType::Int32 => read_primitive!(values, dynamic_value::Reader::Int32, i32),
-        DataType::Int64 => read_primitive!(values, dynamic_value::Reader::Int64, i64),
-        DataType::UInt8 => read_primitive!(values, dynamic_value::Reader::UInt8, u8),
-        DataType::UInt16 => read_primitive!(values, dynamic_value::Reader::UInt16, u16),
-        DataType::UInt32 => read_primitive!(values, dynamic_value::Reader::UInt32, u32),
-        DataType::UInt64 => read_primitive!(values, dynamic_value::Reader::UInt64, u64),
-        DataType::Float32 => read_primitive!(values, dynamic_value::Reader::Float32, f32),
-        DataType::Float64 => read_primitive!(values, dynamic_value::Reader::Float64, f64),
-        DataType::Utf8 =>  {
-            let iter = values.iter().map(|m| match m.borrow() {
-                dynamic_value::Reader::Text(x) => Some(x.to_string().unwrap()),
-                _ => None
-            });
-            Box::new(MutableUtf8Array::<i32>::from_trusted_len_iter(iter))
-        }
-        DataType::Binary =>  {
-            let iter = values.iter().map(|m| match m.borrow() {
-                dynamic_value::Reader::Data(x) => Some(x),
-                _ => None
-            });
-            Box::new(MutableBinaryArray::<i32>::from_trusted_len_iter(iter))
-        }
-        DataType::Struct(fields) => {
-            let arrays: Vec<_> = fields
-                .iter()
-                .map(|f| {
-                    let vals: Vec<_> = values
-                        .iter()
-                        .map(|v| v.borrow()
-                             .downcast::<dynamic_struct::Reader>()
-                             .get_named(&f.name)
-                             .unwrap()
-                        )
-                        .collect();
-                        read_to_array(f, vals.as_slice())
-                }).collect();
-            Box::new(MutableStructArray::new(field.data_type().clone(), arrays))
-        }
-        DataType::List(inner) => {
-            let mut inner_values = vec![];
-            let mut offsets = Offsets::<i32>::with_capacity(values.len());
-            let mut validity = MutableBitmap::with_capacity(values.len());
-
-            values.iter().for_each(|v| match v.borrow() {
-                dynamic_value::Reader::List(l) => {
-                    inner_values.extend(l.iter().map(|x| x.unwrap()));
-                    offsets.try_push_usize(l.len() as usize).expect("List offset too large");
-                    validity.push(true);
-                }
-                _ => {
-                    offsets.extend_constant(1);
-                    validity.push(false)
-                }
-            });
-
-            let inner_array = read_to_array(inner, inner_values.as_slice());
-
-            let array = MutableListArray::<i32, _>::new_from_mutable(
-                inner_array,
-                offsets.clone().into(),
-                validity.into(),
-            );
-
-            Box::new(array)
-        }
-        //TypeVariant::Enum(_e) => DataType::Null, // TODO: Fix
-        //TypeVariant::AnyPointer => panic!("unsupported"),
-        //TypeVariant::Capability => panic!("unsupported"),
-        _ => todo!()
+    } else {
+        None
     }
 }
 
-pub fn read_schema<'a, A: Borrow<dynamic_value::Reader<'a>>>(
-    values: &[A],
-) -> Result<Schema, Error> {
-    // Get the schema from the first line
-    Ok(map_schema(values[0].borrow().downcast()).unwrap())
-}
-
-pub fn read_to_chunk<'a, A: Borrow<dynamic_value::Reader<'a>>>(
-    values: &[A],
-    schema: &Schema,
-) -> Result<Chunk<Box<dyn Array>>, Error>  {
-    let arrays = schema
-        .fields
-        .iter()
-        .map(|f| {
-            let vals: Vec<_> = values
-                .iter()
-                .map(|v| v.borrow()
-                     .downcast::<dynamic_struct::Reader>()
-                     .get_named(&f.name)
-                     .unwrap()
-                )
-                .collect();
-            (&f.name, read_to_array(f, vals.as_slice()))
-        })
-        .collect::<HashMap<_, _>>();
-
-    Ok(Chunk::new(
-        arrays.into_values().map(|mut ma| ma.as_box()).collect(),
-    ))
+// Get schema from first message since all messages have same schema
+pub fn get_schema(messages: &[dynamic_value::Reader]) -> schema::StructSchema {
+    messages[0]
+        .downcast::<dynamic_struct::Reader>()
+        .get_schema()
 }

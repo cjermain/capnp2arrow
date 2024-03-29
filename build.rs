@@ -1,7 +1,7 @@
 fn main() {
     capnpc::CompilerCommand::new()
-        .src_prefix("src/schema")
-        .file("src/schema/point.capnp")
+        .src_prefix("tests/schema")
+        .file("tests/schema/test_all_types.capnp")
         .run()
         .expect("schema compiler command failed");
 }

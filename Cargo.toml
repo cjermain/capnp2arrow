@@ -9,25 +9,18 @@ build = "build.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+edition = "2021"
+
 [build-dependencies]
-capnpc = "0.18.0"
+capnpc = "0.19.0"
+
+[dev-dependencies]
+smartstring = "1.0.1"
+
+[dev-dependencies.polars]
+version = "0.38.1"
+features = ["dtype-struct", "dtype-i8", "dtype-i16", "dtype-u8", "dtype-u16", "dtype-categorical", "rows"]
 
 [dependencies]
-capnp = "0.18.1"
-# arrow2 = "0.17.2"
-indexmap = "2.0.2"
-
-[dependencies.arrow2]
-# git = "https://github.com/jorgecarleitao/arrow2"
-# rev = "3ab9b61f0ec6656d4613ad077c87bad6fac4682d"
-git = "https://github.com/ritchie46/arrow2"
-branch = "polars_2023-06-26"
-
-[dependencies.polars-arrow]
-git = "https://github.com/pola-rs/polars"
-rev = "263ba5153dd3cd03b9f67f5f2de06af19df0529c"
-
-[dependencies.polars]
-git = "https://github.com/pola-rs/polars"
-rev = "263ba5153dd3cd03b9f67f5f2de06af19df0529c"
-features = ["dtype-struct"]
+capnp = "0.19.3"
+polars-arrow = "0.38.1"
