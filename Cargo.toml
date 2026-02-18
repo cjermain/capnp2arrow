@@ -15,7 +15,7 @@ capnpc = "0.25.0"
 [dependencies]
 capnp = "0.25.0"
 # arrow2 = "0.17.2"
-indexmap = "1.9.3"
+indexmap = "2.13.0"
 
 [dependencies.arrow2]
 # git = "https://github.com/jorgecarleitao/arrow2"
