@@ -157,12 +157,6 @@ checksum = "89b2fd2a0dcf38d7971e2194b6b6eebab45ae01067456a7fd93d5547a61b70be"
 
 [[package]]
 name = "capnp"
-version = "0.17.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "95e65021d89250bbfe7c2791789ced2c4bdc21b0e8bb59c64f3fd6145a5fd678"
-
-[[package]]
-name = "capnp"
 version = "0.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fe8af2e2d255489928e31504fa51d86a41d040179098a8ad6828e0d11c54dcd6"
@@ -175,7 +169,7 @@ name = "capnp2arrow"
 version = "0.1.0"
 dependencies = [
  "arrow2",
- "capnp 0.25.0",
+ "capnp",
  "capnpc",
  "indexmap",
  "polars",
@@ -184,11 +178,11 @@ dependencies = [
 
 [[package]]
 name = "capnpc"
-version = "0.17.1"
+version = "0.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "93a9ad66f56468a890565d818ec4ab1300c1f6c62adbbc3295392f61d8f7dbd7"
+checksum = "d6cdfa6b0df161a71201367910265b97180541ecdb48bd08e05ef8694c295d1f"
 dependencies = [
- "capnp 0.17.2",
+ "capnp",
 ]
 
 [[package]]
