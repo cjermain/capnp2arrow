@@ -13,7 +13,7 @@ build = "build.rs"
 capnpc = "0.25.0"
 
 [dependencies]
-capnp = "0.25.0"
+capnp = "0.25.1"
 # arrow2 = "0.17.2"
 indexmap = "2.13.0"
 
